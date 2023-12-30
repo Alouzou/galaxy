@@ -1,6 +1,10 @@
+from kivy.config import Config
+Config.set('graphics', 'width', '900')
+Config.set('graphics', 'height', '400')
+
 from kivy.app import App
 from kivy.graphics import Color, Line
-from kivy.properties import NumericProperty
+from kivy.properties import NumericProperty, Clock
 from kivy.uix.widget import Widget
 
 
@@ -8,14 +12,24 @@ class MainWidget(Widget):
     perspective_point_x = NumericProperty(0)
     perspective_point_y = NumericProperty(0)
 
-    V_NB_LINES = 7
-    V_LINES_SPACING = .1 #pourcentage sur la largeur de l'écran
-    verticaal_lines = []
+    V_NB_LINES = 10
+    V_LINES_SPACING = .25 #pourcentage sur la largeur de l'écran
+    vertical_lines = []
 
+    H_NB_LINES = 8
+    H_LINES_SPACING = .1  # pourcentage sur la largeur de l'écran
+    horizontal_lines = []
+    SPEED = 2
+    current_offset_y = 0
+
+    SPEED_X = 3
+    current_offset_x = 0
     def __init__(self, **kwargs):
         super(MainWidget, self).__init__(**kwargs)
        # print("INIT W:" + str(self.width) + " H:" + str(self.height))
         self.init_vertical_lines()
+        self.init_horizontal_lines()
+        Clock.schedule_interval(self.update, 1.0 / 60.0)
 
 
     def on_parent(self, widget, parent):
@@ -23,7 +37,8 @@ class MainWidget(Widget):
 
 
     def on_size(self, *args):
-        self.update_vertical_lines()
+        #self.update_vertical_lines()
+        #self.update_horizontal_lines()
         pass
         #print("ON SIZE W:" + str(self.width) + " H:" + str(self.height))
         #self.perspective_point_x = self.width / 2
@@ -41,20 +56,80 @@ class MainWidget(Widget):
         with self.canvas:
             Color(1, 1, 1)
             for i in range (0, self.V_NB_LINES):
-                self.verticaal_lines.append(Line())
+                self.vertical_lines.append(Line())
 
     def update_vertical_lines(self):
         central_line_x = self.width / 2
         spacing = self.V_LINES_SPACING * self.width
-        offset = -int(self.V_NB_LINES / 2)
+        offset = -int(self.V_NB_LINES / 2)+0.5
         for i in range(0, self.V_NB_LINES):
-            x1 = int(central_line_x + offset*spacing)
-            y1 = 0
-            x2 = x1
-            y2 = self.height
-            self.verticaal_lines[i].points = [x1, y1, x2, y2]
+            line_x = int(central_line_x + offset * spacing + self.current_offset_x)
+            x1, y1 = self.transform(line_x, 0)
+            x2, y2 = self.transform(line_x, self.height)
+            self.vertical_lines[i].points = [x1, y1, x2, y2]
             offset += 1
         #self.line.points = [self.perspective_point_x, 0, self.perspective_point_x, 100]
+
+    def init_horizontal_lines(self):
+        with self.canvas:
+            Color(1, 1, 1)
+            for i in range (0, self.H_NB_LINES):
+                self.horizontal_lines.append(Line())
+
+    def update_horizontal_lines(self):
+        central_line_x = self.width / 2
+        spacing = self.V_LINES_SPACING * self.width
+        offset = -int(self.V_NB_LINES / 2) + 0.5
+
+        xmin = central_line_x+offset*spacing + self.current_offset_x
+        xmax = central_line_x-offset*spacing + self.current_offset_x
+        spacing_y = self.H_LINES_SPACING * self.height
+        for i in range(0, self.H_NB_LINES):
+            line_y = i* spacing_y - self.current_offset_y
+            x1, y1 = self.transform(xmin, line_y)
+            x2, y2 = self.transform(xmax, line_y)
+            self.horizontal_lines[i].points = [x1, y1, x2, y2]
+
+    def transform(self, x, y):
+        return self.tranfsorm_perspective(x, y)
+        #return self.tranfsorm_2D(x, y)
+
+
+
+    def tranfsorm_2D(self, x, y):
+        return int(x), int(y)
+
+    def tranfsorm_perspective(self, x, y):
+        #TO DO
+        lin_y = y * self.perspective_point_y / self.height
+        if lin_y > self.perspective_point_y:
+            lin_y = self.perspective_point_y
+
+        diff_x = x-self.perspective_point_x
+        diff_y = self.perspective_point_y - lin_y
+        factor_y = diff_y / self.perspective_point_y
+        factor_y = pow(factor_y, 4)
+
+        offset_x = diff_x *  factor_y
+
+        tr_x = self.perspective_point_x + offset_x
+        tr_y = self.perspective_point_y - factor_y*self.perspective_point_y
+        return int(tr_x), int(tr_y)
+
+
+    def update(self, dt):
+        #print("dt : " + str(dt*60))
+        time_factor = dt*60
+        self.update_vertical_lines()
+        self.update_horizontal_lines()
+        self.current_offset_y += self.SPEED * time_factor
+
+        spacing_y = self.H_LINES_SPACING * self.height
+        if self.current_offset_y >= spacing_y:
+            self.current_offset_y-=spacing_y
+
+        self.current_offset_x += self.SPEED_X * time_factor
+
 
 
 
